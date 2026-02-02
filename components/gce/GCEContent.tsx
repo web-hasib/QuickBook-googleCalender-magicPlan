@@ -1,444 +1,128 @@
-"use client";
-
-import { useState } from "react";
+import CreateEventForm from "@/components/gce/CreateEvent";
+import Login from "@/components/gce/Login";
 
 export default function GCEContent() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    role: "",
-    interests: [] as string[],
-  });
-
-  const steps = [
-    {
-      id: "welcome",
-      title: "Welcome to GCE",
-      subtitle: "Let's personalize your experience",
-    },
-    {
-      id: "profile",
-      title: "Tell us about yourself",
-      subtitle: "We'll customize your journey",
-    },
-    {
-      id: "preferences",
-      title: "What interests you?",
-      subtitle: "Pick what matters to you",
-    },
-    {
-      id: "complete",
-      title: "You're all set!",
-      subtitle: "Let's begin your journey",
-    },
-  ];
-
-  const roles = [
-    "Developer",
-    "Designer",
-    "Product Manager",
-    "Marketer",
-    "Other",
-  ];
-  const interestOptions = [
-    "Technology",
-    "Design",
-    "Business",
-    "Marketing",
-    "Analytics",
-    "Collaboration",
-  ];
-
-  const handleNext = () => {
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const toggleInterest = (interest: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      interests: prev.interests.includes(interest)
-        ? prev.interests.filter((i) => i !== interest)
-        : [...prev.interests, interest],
-    }));
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl animate-pulse"></div>
         <div
-          className="absolute top-1/4 -left-20 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse"
-          style={{ animationDuration: "4s" }}></div>
-        <div
-          className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"
-          style={{ animationDuration: "6s", animationDelay: "1s" }}></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-violet-500/5 rounded-full blur-3xl"></div>
+          className="absolute bottom-1/4 -right-20 w-96 h-96 bg-indigo-400/10 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "1s" }}></div>
       </div>
 
-      {/* Main container */}
-      <div className="w-full max-w-2xl relative">
-        {/* Progress indicator */}
-        <div className="mb-12 animate-fadeIn">
-          <div className="flex justify-between items-center mb-3">
-            {steps.map((step, index) => (
-              <div key={step.id} className="flex items-center flex-1">
-                <div
-                  className={`
-                  w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-500
-                  ${
-                    index <= currentStep
-                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/50"
-                      : "bg-slate-800 text-slate-400 border border-slate-700"
-                  }
-                `}>
-                  {index < currentStep ? (
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  ) : (
-                    <span>{index + 1}</span>
-                  )}
-                </div>
-                {index < steps.length - 1 && (
-                  <div
-                    className={`
-                    flex-1 h-0.5 mx-2 transition-all duration-500
-                    ${index < currentStep ? "bg-emerald-500" : "bg-slate-800"}
-                  `}></div>
-                )}
+      <div className="w-full max-w-md relative z-10">
+        {/* Header */}
+        <div className="text-center mb-8 animate-fadeIn">
+          <div className="inline-block mb-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 transform rotate-3 hover:rotate-6 transition-transform duration-300">
+              <svg
+                className="w-8 h-8 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+          </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-2">
+            Calendar Connect
+          </h1>
+          <p className="text-slate-600 text-sm">
+            Seamlessly manage your Google Calendar events
+          </p>
+        </div>
+
+        {/* Card Container */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl shadow-blue-900/10 p-8 border border-white/20 animate-slideUp">
+          <div className="space-y-4">
+            <Login />
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
               </div>
-            ))}
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-3 py-1 text-slate-500 rounded-full">
+                  or
+                </span>
+              </div>
+            </div>
+            <CreateEventForm />
+          </div>
+
+          {/* Features */}
+          <div className="mt-8 pt-6 border-t border-slate-100">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="group cursor-default">
+                <div className="w-10 h-10 mx-auto mb-2 bg-blue-50 rounded-xl flex items-center justify-center group-hover:bg-blue-100 transition-colors duration-300">
+                  <svg
+                    className="w-5 h-5 text-blue-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-xs font-medium text-slate-600">Fast</p>
+              </div>
+              <div className="group cursor-default">
+                <div className="w-10 h-10 mx-auto mb-2 bg-indigo-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-100 transition-colors duration-300">
+                  <svg
+                    className="w-5 h-5 text-indigo-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-xs font-medium text-slate-600">Secure</p>
+              </div>
+              <div className="group cursor-default">
+                <div className="w-10 h-10 mx-auto mb-2 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-slate-100 transition-colors duration-300">
+                  <svg
+                    className="w-5 h-5 text-slate-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+                    />
+                  </svg>
+                </div>
+                <p className="text-xs font-medium text-slate-600">Simple</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Content card */}
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-3xl border border-slate-800/50 shadow-2xl p-8 md:p-12 animate-slideUp">
-          {/* Step content */}
-          <div className="mb-8">
-            <h1
-              className="text-4xl md:text-5xl font-light text-white mb-3 tracking-tight animate-fadeIn"
-              style={{
-                fontFamily: "system-ui, -apple-system, sans-serif",
-                animationDelay: "0.1s",
-              }}>
-              {steps[currentStep].title}
-            </h1>
-            <p
-              className="text-slate-400 text-lg animate-fadeIn"
-              style={{ animationDelay: "0.2s" }}>
-              {steps[currentStep].subtitle}
-            </p>
-          </div>
-
-          {/* Step 0: Welcome */}
-          {currentStep === 0 && (
-            <div className="space-y-6 animate-fadeIn">
-              <div className="bg-gradient-to-br from-emerald-500/10 to-blue-500/10 rounded-2xl p-8 border border-emerald-500/20">
-                <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <svg
-                      className="w-6 h-6 text-emerald-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-white font-medium mb-2">
-                      Quick & Easy Setup
-                    </h3>
-                    <p className="text-slate-400 text-sm">
-                      Just a few steps to get you started. We&apos;ll have you
-                      up and running in under 2 minutes.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-slate-800/30 rounded-xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all">
-                  <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center mb-3">
-                    <svg
-                      className="w-5 h-5 text-blue-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-                      />
-                    </svg>
-                  </div>
-                  <h4 className="text-white text-sm font-medium mb-1">
-                    Personalized
-                  </h4>
-                  <p className="text-slate-500 text-xs">
-                    Tailored to your needs
-                  </p>
-                </div>
-
-                <div className="bg-slate-800/30 rounded-xl p-6 border border-slate-700/50 hover:border-slate-600/50 transition-all">
-                  <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center mb-3">
-                    <svg
-                      className="w-5 h-5 text-violet-400"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                      />
-                    </svg>
-                  </div>
-                  <h4 className="text-white text-sm font-medium mb-1">
-                    Secure
-                  </h4>
-                  <p className="text-slate-500 text-xs">
-                    Your data is protected
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 1: Profile */}
-          {currentStep === 1 && (
-            <div className="space-y-6 animate-fadeIn">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Your Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
-                  placeholder="Enter your full name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
-                  placeholder="you@example.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Your Role
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {roles.map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => setFormData({ ...formData, role })}
-                      className={`
-                        px-4 py-3 rounded-xl text-sm font-medium transition-all
-                        ${
-                          formData.role === role
-                            ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
-                            : "bg-slate-800/50 text-slate-300 border border-slate-700 hover:border-slate-600"
-                        }
-                      `}>
-                      {role}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Preferences */}
-          {currentStep === 2 && (
-            <div className="space-y-6 animate-fadeIn">
-              <p className="text-slate-400 text-sm">Select all that apply</p>
-              <div className="grid grid-cols-2 gap-3">
-                {interestOptions.map((interest) => (
-                  <button
-                    key={interest}
-                    onClick={() => toggleInterest(interest)}
-                    className={`
-                      px-5 py-4 rounded-xl text-sm font-medium transition-all text-left
-                      ${
-                        formData.interests.includes(interest)
-                          ? "bg-gradient-to-br from-emerald-500 to-blue-500 text-white shadow-lg shadow-emerald-500/30 border-0"
-                          : "bg-slate-800/50 text-slate-300 border border-slate-700 hover:border-slate-600"
-                      }
-                    `}>
-                    <div className="flex items-center justify-between">
-                      <span>{interest}</span>
-                      {formData.interests.includes(interest) && (
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Complete */}
-          {currentStep === 3 && (
-            <div className="text-center space-y-6 animate-fadeIn py-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/50 animate-bounce">
-                <svg
-                  className="w-10 h-10 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-2xl text-white font-light mb-2">
-                  Welcome aboard, {formData.name || "there"}!
-                </h3>
-                <p className="text-slate-400">
-                  Your personalized experience is ready
-                </p>
-              </div>
-              <div className="bg-slate-800/30 rounded-xl p-6 border border-slate-700/50 text-left space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-400">Name</span>
-                  <span className="text-white">{formData.name || "—"}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-400">Email</span>
-                  <span className="text-white">{formData.email || "—"}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-400">Role</span>
-                  <span className="text-white">{formData.role || "—"}</span>
-                </div>
-                <div className="flex items-start justify-between text-sm">
-                  <span className="text-slate-400">Interests</span>
-                  <span className="text-white text-right">
-                    {formData.interests.join(", ") || "—"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation buttons */}
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-800">
-            <button
-              onClick={handleBack}
-              disabled={currentStep === 0}
-              className={`
-                px-6 py-3 rounded-xl text-sm font-medium transition-all
-                ${
-                  currentStep === 0
-                    ? "opacity-0 pointer-events-none"
-                    : "text-slate-300 hover:text-white hover:bg-slate-800/50"
-                }
-              `}>
-              ← Back
-            </button>
-
-            <button
-              onClick={handleNext}
-              disabled={currentStep === steps.length - 1}
-              className={`
-                px-8 py-3 rounded-xl text-sm font-medium transition-all shadow-lg
-                ${
-                  currentStep === steps.length - 1
-                    ? "bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-emerald-500/50 hover:shadow-emerald-500/70 hover:scale-105"
-                    : "bg-gradient-to-r from-emerald-500 to-blue-500 text-white shadow-emerald-500/50 hover:shadow-emerald-500/70 hover:scale-105"
-                }
-              `}>
-              {currentStep === steps.length - 1 ? "Get Started" : "Continue →"}
-            </button>
-          </div>
+        {/* Footer */}
+        <div
+          className="text-center mt-6 animate-fadeIn"
+          style={{ animationDelay: "0.2s" }}>
+          <p className="text-xs text-slate-500">
+            Powered by Google Calendar API
+          </p>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.6s ease-out forwards;
-        }
-
-        .animate-slideUp {
-          animation: slideUp 0.8s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 }
