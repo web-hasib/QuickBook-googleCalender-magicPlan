@@ -1,5 +1,5 @@
-import GCEContent from "@/components/gce/GCEContent";
+import OnboardingContent from "@/components/onboarding/OnboardingContent";
 
 export default function page() {
-  return <GCEContent />;
+  return <OnboardingContent />;
 }
