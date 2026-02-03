@@ -123,12 +123,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-.glass-effect {
-  background: rgba(69, 211, 219, 0.01);
-  backdrop-filter: blur(11px);
-  -webkit-backdrop-filter: blur(11px);
-  border-radius: 48px;
-  border: 3px solid rgba(152, 107, 106, 0.01);
-  box-shadow: 0 0 44px 0px rgba(60, 128, 155, 0.34);
-}
