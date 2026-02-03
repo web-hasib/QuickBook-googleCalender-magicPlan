@@ -21,7 +21,7 @@ export default function OnboardingContent() {
       title: "Google Calendar Event Automation",
       description: "Auto-create, sync, and manage calendar events",
       cta: "Connect Google Calendar",
-      route: "/calendar-integration",
+      route: "/create-event",
       icon: Calendar,
     },
     {
