@@ -1,6 +1,7 @@
 "use client";
 
 import { Calendar, CheckSquare, DollarSign, FileText } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function OnboardingContent() {
@@ -93,9 +94,11 @@ export default function OnboardingContent() {
                     </div>
 
                     {/* CTA Button - Fixed at bottom */}
-                    <button className="w-full bg-white/20 hover:bg-white/30 text-white text-xs sm:text-sm font-medium py-1.5 sm:py-2 md:py-2.5 px-3 sm:px-4 rounded-lg transition-all duration-200 border border-white/30 group-hover:border-white/50 mt-auto">
+                    <Link
+                      href={feature.route}
+                      className="w-full bg-white/20 hover:bg-white/30 text-white text-xs sm:text-sm font-medium py-1.5 sm:py-2 md:py-2.5 px-3 sm:px-4 rounded-lg transition-all duration-200 border border-white/30 group-hover:border-white/50 mt-auto">
                       {feature.cta}
-                    </button>
+                    </Link>
                   </div>
                 );
               })}
@@ -103,11 +106,11 @@ export default function OnboardingContent() {
 
             {/* Skip Option */}
             <div className="mt-4 sm:mt-6 md:mt-8">
-              <button
-                onClick={() => router.push("/dashboard")}
+              <Link
+                href={"/login"}
                 className="text-sm sm:text-base text-white/80 hover:text-white underline underline-offset-4 transition-colors">
                 Skip for now
-              </button>
+              </Link>
             </div>
           </div>
         </div>
