@@ -268,7 +268,7 @@
 
 //     if (err instanceof ZodError) {
 //       return NextResponse.json(
-//         { success: false, error: "Validation failed", details: err.errors },
+//         { success: false, error: "Validation failed", details: err.issues },
 //         { status: 400 },
 //       );
 //     }
@@ -306,7 +306,7 @@
 
 //     if (err instanceof ZodError) {
 //       return NextResponse.json(
-//         { success: false, error: "Validation failed", details: err.errors },
+//         { success: false, error: "Validation failed", details: err.issues },
 //         { status: 400 },
 //       );
 //     }
@@ -1054,7 +1054,7 @@ export async function POST(req: Request) {
 
     if (err instanceof ZodError) {
       return NextResponse.json(
-        { success: false, error: "Validation failed", details: err.errors },
+        { success: false, error: "Validation failed", details: err.issues },
         { status: 400 },
       );
     }
@@ -1128,7 +1128,7 @@ export async function PUT(req: Request) {
 
     if (err instanceof ZodError) {
       return NextResponse.json(
-        { success: false, error: "Validation failed", details: err.errors },
+        { success: false, error: "Validation failed", details: err.issues },
         { status: 400 },
       );
     }
