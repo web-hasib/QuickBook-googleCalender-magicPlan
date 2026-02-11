@@ -1266,7 +1266,7 @@ function handleError(error: unknown): NextResponse<ApiResponse> {
     return createErrorResponse(
       "Validation failed",
       400,
-      error.errors.map((e) => ({
+      error.issues.map((e) => ({
         path: e.path.join("."),
         message: e.message,
       })),

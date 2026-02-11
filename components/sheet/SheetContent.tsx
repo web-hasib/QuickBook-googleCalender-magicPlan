@@ -493,528 +493,565 @@ export default function SheetContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen w-full relative overflow-hidden">
+      {/* Background Image */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/page-background.jpg')",
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Glassmorphism overlay */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        aria-hidden="true"
+      />
+
       {/* Error Toast */}
       {error && (
-        <div className="fixed top-4 right-4 z-50 bg-red-500/20 border border-red-500/30 backdrop-blur-xl rounded-xl p-4 max-w-md animate-in slide-in-from-right-4">
+        <div className="fixed top-4 right-4 z-50 bg-red-500/20 border border-red-500/30 backdrop-blur-xl rounded-xl p-4 max-w-md shadow-2xl animate-in slide-in-from-right-4">
           <div className="flex items-start gap-3">
+            <article className="h-5 w-5 text-red-300 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-red-200 font-medium">Error</p>
-              <p className="text-red-300 text-sm mt-1">{error}</p>
+              <p className="text-red-200 font-semibold">Error</p>
+              <p className="text-red-300/90 text-sm mt-1">{error}</p>
             </div>
             <button
               onClick={() => setError(null)}
-              className="text-red-300 hover:text-red-200">
+              className="text-red-300 hover:text-red-200 transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
-
-      <div className="max-w-7xl mx-auto space-y-6 relative z-10">
+      {/* Content */}
+      <div className="relative min-h-screen flex flex-col px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Header Section */}
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Google Sheets Dashboard
-              </h1>
-              <p className="text-slate-400 mt-2 text-sm sm:text-base">
-                Manage and view your spreadsheet data in real-time
-              </p>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-              <span className="text-emerald-400 font-medium text-sm">
-                {data ? data.rows.length : 0} rows
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Sheet Tabs */}
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4">
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
-            {sheets.map((sheet) => (
-              <button
-                key={sheet.id}
-                onClick={() => setCurrentSheet(sheet.title)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
-                  currentSheet === sheet.title
-                    ? "bg-blue-500/20 border border-blue-500/50 text-blue-400"
-                    : "bg-slate-800/50 border border-slate-700/50 text-slate-300 hover:bg-slate-700/50"
-                }`}>
-                <FileText className="inline-block h-4 w-4 mr-2" />
-                {sheet.title}
-              </button>
-            ))}
-            <button
-              onClick={() => setShowCreateSheet(true)}
-              className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-all whitespace-nowrap">
-              <Plus className="inline-block h-4 w-4 mr-2" />
-              New Sheet
-            </button>
-          </div>
-        </div>
-
-        {/* Action Bar */}
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4 sm:p-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            {/* Search Input */}
-            <div className="relative w-full lg:w-96 group">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5 group-hover:text-blue-400 transition-colors" />
-              <input
-                type="text"
-                placeholder="Search across all data..."
-                value={searchTerm}
-                onChange={(e) => {
-                  handleSearchChange(e.target.value);
-                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                }}
-                onKeyDown={(e) => e.key === "Enter" && performSearch()}
-                className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-slate-200 placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all"
-              />
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 w-full lg:w-auto flex-wrap">
-              <button
-                onClick={() => fetchData(currentSheet)}
-                disabled={loading}
-                className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-slate-200 hover:bg-slate-700/50 hover:border-slate-600/50 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                {loading ? (
-                  <RefreshCw className="h-5 w-5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-5 w-5" />
-                )}
-              </button>
-              <button
-                onClick={() => setShowAddRow(true)}
-                disabled={!data}
-                className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-blue-400 hover:bg-blue-500/20 hover:border-blue-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                <Rows className="h-5 w-5" />
-                <span className="font-medium">Add Row</span>
-              </button>
-              <button
-                onClick={() => setShowAddColumn(true)}
-                disabled={!data}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-500/10 border border-purple-500/30 rounded-xl text-purple-400 hover:bg-purple-500/20 hover:border-purple-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                <Columns className="h-5 w-5" />
-                <span className="font-medium">Add Column</span>
-              </button>
-              <button
-                onClick={exportToCSV}
-                disabled={!data || filteredRows.length === 0}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                <Download className="h-5 w-5" />
-              </button>
+        <div className="w-full max-w-7xl mx-auto mb-8">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/20">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white drop-shadow-lg mb-2">
+                  Google Sheets Dashboard
+                </h1>
+                <p className="text-sm sm:text-base md:text-lg text-white/90 drop-shadow-md">
+                  Manage and view your spreadsheet data in real-time
+                </p>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/20 border border-emerald-400/30 rounded-xl backdrop-blur-sm shadow-lg">
+                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-400/50"></div>
+                <span className="text-emerald-300 font-semibold text-sm">
+                  {data ? data.rows.length : 0} rows
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Add Row Modal */}
-        {showAddRow && data && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Add New Row</h2>
+        <div className="w-full max-w-7xl mx-auto space-y-6 flex-1">
+          {/* Sheet Tabs */}
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl p-4 border border-white/20">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+              {sheets.map((sheet) => (
                 <button
-                  onClick={() => setShowAddRow(false)}
-                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
-                  <X className="h-5 w-5 text-slate-400" />
+                  key={sheet.id}
+                  onClick={() => setCurrentSheet(sheet.title)}
+                  className={`px-4 py-2.5 rounded-xl font-semibold transition-all whitespace-nowrap shadow-lg ${
+                    currentSheet === sheet.title
+                      ? "bg-white/30 border border-white/40 text-white"
+                      : "bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white"
+                  }`}>
+                  <FileText className="inline-block h-4 w-4 mr-2" />
+                  {sheet.title}
+                </button>
+              ))}
+              <button
+                onClick={() => setShowCreateSheet(true)}
+                className="px-4 py-2.5 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-emerald-300 hover:bg-emerald-500/30 hover:border-emerald-400/50 transition-all whitespace-nowrap font-semibold shadow-lg">
+                <Plus className="inline-block h-4 w-4 mr-2" />
+                New Sheet
+              </button>
+            </div>
+          </div>
+
+          {/* Action Bar */}
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 border border-white/20">
+            <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+              {/* Search Input */}
+              <div className="relative w-full lg:w-96 group">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/60 h-5 w-5 group-hover:text-white/80 transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Search across all data..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    handleSearchChange(e.target.value);
+                    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && performSearch()}
+                  className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 focus:outline-none transition-all backdrop-blur-sm"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 w-full lg:w-auto flex-wrap">
+                <button
+                  onClick={() => fetchData(currentSheet)}
+                  disabled={loading}
+                  className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white hover:bg-white/20 hover:border-white/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
+                  {loading ? (
+                    <RefreshCw className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-5 w-5" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowAddRow(true)}
+                  disabled={!data}
+                  className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/20 border border-blue-400/30 rounded-xl text-blue-300 hover:bg-blue-500/30 hover:border-blue-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg">
+                  <Rows className="h-5 w-5" />
+                  <span>Add Row</span>
+                </button>
+                <button
+                  onClick={() => setShowAddColumn(true)}
+                  disabled={!data}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-500/20 border border-purple-400/30 rounded-xl text-purple-300 hover:bg-purple-500/30 hover:border-purple-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg">
+                  <Columns className="h-5 w-5" />
+                  <span className="hidden sm:inline">Add Column</span>
+                </button>
+                <button
+                  onClick={exportToCSV}
+                  disabled={!data || filteredRows.length === 0}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-emerald-300 hover:bg-emerald-500/30 hover:border-emerald-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
+                  <Download className="h-5 w-5" />
                 </button>
               </div>
-              <div className="space-y-4">
-                {data.headers.map((header, index) => (
-                  <div key={index}>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      {header}
+            </div>
+          </div>
+
+          {/* Add Row Modal */}
+          {showAddRow && data && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">Add New Row</h2>
+                  <button
+                    onClick={() => setShowAddRow(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                    <X className="h-5 w-5 text-white/80" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {data.headers.map((header, index) => (
+                    <div key={index}>
+                      <label className="block text-sm font-semibold text-white/90 mb-2">
+                        {header}
+                      </label>
+                      <input
+                        type="text"
+                        value={newRowData[index] || ""}
+                        onChange={(e) => {
+                          const updated = [...newRowData];
+                          updated[index] = e.target.value;
+                          setNewRowData(updated);
+                        }}
+                        className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 focus:outline-none backdrop-blur-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={addRow}
+                    className="flex-1 px-4 py-3 bg-blue-500/30 border border-blue-400/40 text-white font-semibold rounded-xl hover:bg-blue-500/40 transition-all shadow-lg">
+                    Add Row
+                  </button>
+                  <button
+                    onClick={() => setShowAddRow(false)}
+                    className="px-4 py-3 bg-white/10 border border-white/20 text-white/90 font-semibold rounded-xl hover:bg-white/20 transition-all">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Column Modal */}
+          {showAddColumn && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">
+                    Add New Column
+                  </h2>
+                  <button
+                    onClick={() => setShowAddColumn(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                    <X className="h-5 w-5 text-white/80" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-white/90 mb-2">
+                      Column Name
                     </label>
                     <input
                       type="text"
-                      value={newRowData[index] || ""}
-                      onChange={(e) => {
-                        const updated = [...newRowData];
-                        updated[index] = e.target.value;
-                        setNewRowData(updated);
-                      }}
-                      className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+                      value={newColumnName}
+                      onChange={(e) => setNewColumnName(e.target.value)}
+                      placeholder="Enter column name..."
+                      className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 focus:outline-none backdrop-blur-sm"
                     />
                   </div>
-                ))}
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={addRow}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                  Add Row
-                </button>
-                <button
-                  onClick={() => setShowAddRow(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add Column Modal */}
-        {showAddColumn && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">
-                  Add New Column
-                </h2>
-                <button
-                  onClick={() => setShowAddColumn(false)}
-                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
-                  <X className="h-5 w-5 text-slate-400" />
-                </button>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Column Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newColumnName}
-                    onChange={(e) => setNewColumnName(e.target.value)}
-                    placeholder="Enter column name..."
-                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none"
-                  />
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={addColumn}
+                    className="flex-1 px-4 py-3 bg-purple-500/30 border border-purple-400/40 text-white font-semibold rounded-xl hover:bg-purple-500/40 transition-all shadow-lg">
+                    Add Column
+                  </button>
+                  <button
+                    onClick={() => setShowAddColumn(false)}
+                    className="px-4 py-3 bg-white/10 border border-white/20 text-white/90 font-semibold rounded-xl hover:bg-white/20 transition-all">
+                    Cancel
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={addColumn}
-                  className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
-                  Add Column
-                </button>
-                <button
-                  onClick={() => setShowAddColumn(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">
-                  Cancel
-                </button>
-              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Create Sheet Modal */}
-        {showCreateSheet && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">
-                  Create New Sheet
-                </h2>
-                <button
-                  onClick={() => setShowCreateSheet(false)}
-                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
-                  <X className="h-5 w-5 text-slate-400" />
-                </button>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Sheet Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newSheetName}
-                    onChange={(e) => setNewSheetName(e.target.value)}
-                    placeholder="Enter sheet name..."
-                    className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none"
-                  />
+          {/* Create Sheet Modal */}
+          {showCreateSheet && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">
+                    Create New Sheet
+                  </h2>
+                  <button
+                    onClick={() => setShowCreateSheet(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                    <X className="h-5 w-5 text-white/80" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-white/90 mb-2">
+                      Sheet Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newSheetName}
+                      onChange={(e) => setNewSheetName(e.target.value)}
+                      placeholder="Enter sheet name..."
+                      className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 focus:outline-none backdrop-blur-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={createSheet}
+                    className="flex-1 px-4 py-3 bg-emerald-500/30 border border-emerald-400/40 text-white font-semibold rounded-xl hover:bg-emerald-500/40 transition-all shadow-lg">
+                    Create Sheet
+                  </button>
+                  <button
+                    onClick={() => setShowCreateSheet(false)}
+                    className="px-4 py-3 bg-white/10 border border-white/20 text-white/90 font-semibold rounded-xl hover:bg-white/20 transition-all">
+                    Cancel
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={createSheet}
-                  className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">
-                  Create Sheet
-                </button>
-                <button
-                  onClick={() => setShowCreateSheet(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors">
-                  Cancel
-                </button>
-              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Table Section */}
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden">
-          {!data && loading ? (
-            <div className="flex items-center justify-center py-24">
-              <div className="text-center space-y-4">
-                <Loader2 className="h-16 w-16 animate-spin text-blue-400 mx-auto" />
-                <p className="text-slate-400 text-lg">Loading sheet data...</p>
+          {/* Table Section */}
+          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+            {!data && loading ? (
+              <div className="flex items-center justify-center py-24">
+                <div className="text-center space-y-4">
+                  <Loader2 className="h-16 w-16 animate-spin text-white mx-auto" />
+                  <p className="text-white text-xl font-semibold">
+                    Loading sheet data...
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : data && currentRows.length > 0 ? (
-            <>
-              {/* Desktop Table */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-700/50 bg-slate-800/50 backdrop-blur-sm">
-                      {data.headers.map((header, index) => (
-                        <th
-                          key={index}
-                          className="px-6 py-4 text-left text-sm font-semibold text-slate-300 uppercase tracking-wider whitespace-nowrap group">
-                          <div className="flex items-center gap-2">
-                            {header}
-                            <button
-                              onClick={() => sortData(index)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              <ArrowUpDown className="h-4 w-4 text-slate-400 hover:text-blue-400" />
-                            </button>
-                          </div>
-                        </th>
-                      ))}
-                      <th className="px-6 py-4 text-right text-sm font-semibold text-slate-300 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {currentRows.map((row, rowIndex) => {
-                      const actualRowIndex = pagination.startIndex + rowIndex;
-                      return (
-                        <tr
-                          key={actualRowIndex}
-                          className="hover:bg-slate-800/30 transition-colors group">
-                          {row.map((cell, cellIndex) => (
-                            <td
-                              key={cellIndex}
-                              className="px-6 py-4 text-slate-300 whitespace-nowrap cursor-pointer hover:bg-slate-700/30"
-                              onClick={() =>
-                                handleCellEdit(actualRowIndex, cellIndex, cell)
-                              }>
-                              {editingCell?.row === actualRowIndex &&
-                              editingCell?.col === cellIndex ? (
-                                <input
-                                  type="text"
-                                  defaultValue={cell}
-                                  autoFocus
-                                  onBlur={(e) => handleSaveEdit(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      handleSaveEdit(e.currentTarget.value);
-                                    } else if (e.key === "Escape") {
-                                      setEditingCell(null);
-                                    }
-                                  }}
-                                  className="w-full px-2 py-1 bg-slate-800 border border-blue-500 rounded text-slate-200 focus:outline-none"
-                                />
-                              ) : (
-                                cell || (
-                                  <span className="text-slate-600 italic">
-                                    —
-                                  </span>
-                                )
-                              )}
-                            </td>
-                          ))}
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            ) : data && currentRows.length > 0 ? (
+              <>
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-white/20 bg-white/5">
+                        {data.headers.map((header, index) => (
+                          <th
+                            key={index}
+                            className="px-6 py-4 text-left text-sm font-semibold text-white uppercase tracking-wider whitespace-nowrap group">
+                            <div className="flex items-center gap-2">
+                              {header}
                               <button
-                                onClick={() => deleteRow(actualRowIndex)}
-                                className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-                                <Trash2 className="h-4 w-4" />
+                                onClick={() => sortData(index)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <ArrowUpDown className="h-4 w-4 text-white/60 hover:text-white" />
                               </button>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </th>
+                        ))}
+                        <th className="px-6 py-4 text-right text-sm font-semibold text-white uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {currentRows.map((row, rowIndex) => {
+                        const actualRowIndex = pagination.startIndex + rowIndex;
+                        return (
+                          <tr
+                            key={actualRowIndex}
+                            className="hover:bg-white/5 transition-colors group">
+                            {row.map((cell, cellIndex) => (
+                              <td
+                                key={cellIndex}
+                                className="px-6 py-4 text-white/90 whitespace-nowrap cursor-pointer hover:bg-white/10 transition-colors"
+                                onClick={() =>
+                                  handleCellEdit(
+                                    actualRowIndex,
+                                    cellIndex,
+                                    cell,
+                                  )
+                                }>
+                                {editingCell?.row === actualRowIndex &&
+                                editingCell?.col === cellIndex ? (
+                                  <input
+                                    type="text"
+                                    defaultValue={cell}
+                                    autoFocus
+                                    onBlur={(e) =>
+                                      handleSaveEdit(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        handleSaveEdit(e.currentTarget.value);
+                                      } else if (e.key === "Escape") {
+                                        setEditingCell(null);
+                                      }
+                                    }}
+                                    className="w-full px-2 py-1 bg-white/20 border border-white/40 rounded text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                                  />
+                                ) : (
+                                  cell || (
+                                    <span className="text-white/40 italic">
+                                      —
+                                    </span>
+                                  )
+                                )}
+                              </td>
+                            ))}
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => deleteRow(actualRowIndex)}
+                                  className="p-2 text-red-300 hover:bg-red-500/20 rounded-lg transition-colors">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-              {/* Mobile Cards */}
-              <div className="md:hidden space-y-4 p-4">
-                {currentRows.map((row, rowIndex) => {
-                  const actualRowIndex = pagination.startIndex + rowIndex;
-                  return (
-                    <div
-                      key={actualRowIndex}
-                      className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4 space-y-3">
-                      {data.headers.map((header, cellIndex) => (
-                        <div key={cellIndex} className="flex justify-between">
-                          <span className="text-slate-400 text-sm font-medium">
-                            {header}:
-                          </span>
-                          <span className="text-slate-200 text-sm">
-                            {row[cellIndex] || (
-                              <span className="text-slate-600 italic">—</span>
-                            )}
-                          </span>
+                {/* Mobile Cards */}
+                <div className="md:hidden space-y-4 p-4">
+                  {currentRows.map((row, rowIndex) => {
+                    const actualRowIndex = pagination.startIndex + rowIndex;
+                    return (
+                      <div
+                        key={actualRowIndex}
+                        className="bg-white/5 border border-white/20 rounded-xl p-4 space-y-3 backdrop-blur-sm">
+                        {data.headers.map((header, cellIndex) => (
+                          <div
+                            key={cellIndex}
+                            className="flex justify-between items-start gap-3">
+                            <span className="text-white/70 text-sm font-semibold">
+                              {header}:
+                            </span>
+                            <span className="text-white text-sm text-right">
+                              {row[cellIndex] || (
+                                <span className="text-white/40 italic">—</span>
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex gap-2 pt-2 border-t border-white/20">
+                          <button
+                            onClick={() => deleteRow(actualRowIndex)}
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-red-300 bg-red-500/20 border border-red-400/30 rounded-lg text-sm font-semibold hover:bg-red-500/30 transition-all">
+                            <Trash2 className="h-4 w-4" />
+                            Delete
+                          </button>
                         </div>
-                      ))}
-                      <div className="flex gap-2 pt-2 border-t border-slate-700/30">
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Pagination */}
+                {pagination.totalPages > 1 && (
+                  <div className="border-t border-white/20 bg-white/5 px-6 py-4 backdrop-blur-sm">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <p className="text-white/80 text-sm">
+                        Showing {pagination.startIndex + 1} to{" "}
+                        {pagination.endIndex} of {filteredRows.length} results
+                      </p>
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={() => deleteRow(actualRowIndex)}
-                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-red-400 bg-red-500/10 rounded-lg text-sm">
-                          <Trash2 className="h-4 w-4" />
-                          Delete
+                          onClick={() =>
+                            handlePageChange(pagination.currentPage - 1)
+                          }
+                          disabled={pagination.currentPage === 1}
+                          className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <div className="flex gap-1">
+                          {Array.from(
+                            { length: pagination.totalPages },
+                            (_, i) => i + 1,
+                          )
+                            .filter(
+                              (page) =>
+                                page === 1 ||
+                                page === pagination.totalPages ||
+                                Math.abs(page - pagination.currentPage) <= 1,
+                            )
+                            .map((page, index, array) => (
+                              <div
+                                key={page}
+                                className="flex items-center gap-1">
+                                {index > 0 && array[index - 1] !== page - 1 && (
+                                  <span className="text-white/40 px-2">
+                                    ...
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() => handlePageChange(page)}
+                                  className={`px-4 py-2 rounded-xl font-semibold transition-all ${
+                                    pagination.currentPage === page
+                                      ? "bg-white/30 border border-white/40 text-white shadow-lg"
+                                      : "bg-white/10 border border-white/20 text-white/80 hover:bg-white/20"
+                                  }`}>
+                                  {page}
+                                </button>
+                              </div>
+                            ))}
+                        </div>
+                        <button
+                          onClick={() =>
+                            handlePageChange(pagination.currentPage + 1)
+                          }
+                          disabled={
+                            pagination.currentPage === pagination.totalPages
+                          }
+                          className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                          <ChevronRight className="h-5 w-5" />
                         </button>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-24 space-y-4">
+                <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto backdrop-blur-sm">
+                  <Filter className="h-10 w-10 text-white/60" />
+                </div>
+                <div>
+                  <p className="text-white text-xl font-semibold">
+                    {data ? "No matching data found" : "No data available"}
+                  </p>
+                  <p className="text-white/70 text-sm mt-2">
+                    {searchTerm
+                      ? "Try adjusting your search terms"
+                      : "Start by adding some data to your sheet"}
+                  </p>
+                </div>
               </div>
+            )}
+          </div>
 
-              {/* Pagination */}
-              {pagination.totalPages > 1 && (
-                <div className="border-t border-slate-700/50 bg-slate-800/30 px-6 py-4">
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <p className="text-slate-400 text-sm">
-                      Showing {pagination.startIndex + 1} to{" "}
-                      {pagination.endIndex} of {filteredRows.length} results
+          {/* Stats Cards */}
+          {data && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:bg-white/15 hover:-translate-y-1 transition-all group">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/70 text-sm mb-1 font-medium">
+                      Total Rows
                     </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() =>
-                          handlePageChange(pagination.currentPage - 1)
-                        }
-                        disabled={pagination.currentPage === 1}
-                        className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-300 hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                        <ChevronLeft className="h-5 w-5" />
-                      </button>
-                      <div className="flex gap-1">
-                        {Array.from(
-                          { length: pagination.totalPages },
-                          (_, i) => i + 1,
-                        )
-                          .filter(
-                            (page) =>
-                              page === 1 ||
-                              page === pagination.totalPages ||
-                              Math.abs(page - pagination.currentPage) <= 1,
-                          )
-                          .map((page, index, array) => (
-                            <div key={page} className="flex items-center gap-1">
-                              {index > 0 && array[index - 1] !== page - 1 && (
-                                <span className="text-slate-600 px-2">...</span>
-                              )}
-                              <button
-                                onClick={() => handlePageChange(page)}
-                                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                                  pagination.currentPage === page
-                                    ? "bg-blue-500/20 border border-blue-500/50 text-blue-400"
-                                    : "bg-slate-800/50 border border-slate-700/50 text-slate-300 hover:bg-slate-700/50"
-                                }`}>
-                                {page}
-                              </button>
-                            </div>
-                          ))}
-                      </div>
-                      <button
-                        onClick={() =>
-                          handlePageChange(pagination.currentPage + 1)
-                        }
-                        disabled={
-                          pagination.currentPage === pagination.totalPages
-                        }
-                        className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-300 hover:bg-slate-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                        <ChevronRight className="h-5 w-5" />
-                      </button>
-                    </div>
+                    <p className="text-3xl font-bold text-white">
+                      {data.rows.length}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-500/20 border border-blue-400/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Rows className="w-6 h-6 text-blue-300" />
                   </div>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-24 space-y-4">
-              <div className="w-20 h-20 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto">
-                <Filter className="h-10 w-10 text-slate-600" />
               </div>
-              <div>
-                <p className="text-slate-300 text-xl font-medium">
-                  {data ? "No matching data found" : "No data available"}
-                </p>
-                <p className="text-slate-500 text-sm mt-2">
-                  {searchTerm
-                    ? "Try adjusting your search terms"
-                    : "Start by adding some data to your sheet"}
-                </p>
+
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:bg-white/15 hover:-translate-y-1 transition-all group">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/70 text-sm mb-1 font-medium">
+                      Columns
+                    </p>
+                    <p className="text-3xl font-bold text-white">
+                      {data.columnCount}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-500/20 border border-purple-400/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Columns className="w-6 h-6 text-purple-300" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:bg-white/15 hover:-translate-y-1 transition-all group">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/70 text-sm mb-1 font-medium">
+                      Filtered
+                    </p>
+                    <p className="text-3xl font-bold text-white">
+                      {filteredRows.length}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-400/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Search className="w-6 h-6 text-emerald-300" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:bg-white/15 hover:-translate-y-1 transition-all group">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/70 text-sm mb-1 font-medium">
+                      Current Page
+                    </p>
+                    <p className="text-3xl font-bold text-white">
+                      {pagination.currentPage}/{pagination.totalPages}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-orange-500/20 border border-orange-400/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <FileText className="w-6 h-6 text-orange-300" />
+                  </div>
+                </div>
               </div>
             </div>
           )}
         </div>
-
-        {/* Stats Cards */}
-        {data && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6 shadow-xl hover:shadow-2xl hover:border-blue-500/30 transition-all group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-sm mb-1">Total Rows</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                    {data.rows.length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Rows className="w-6 h-6 text-blue-400" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6 shadow-xl hover:shadow-2xl hover:border-purple-500/30 transition-all group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-sm mb-1">Columns</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    {data.columnCount}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Columns className="w-6 h-6 text-purple-400" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6 shadow-xl hover:shadow-2xl hover:border-emerald-500/30 transition-all group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-sm mb-1">Filtered</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                    {filteredRows.length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Search className="w-6 h-6 text-emerald-400" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6 shadow-xl hover:shadow-2xl hover:border-orange-500/30 transition-all group">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-sm mb-1">Current Page</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent">
-                    {pagination.currentPage}/{pagination.totalPages}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <FileText className="w-6 h-6 text-orange-400" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

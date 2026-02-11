@@ -21,7 +21,7 @@ export default function OnboardingContent() {
       title: "Google Calendar Event Automation",
       description: "Auto-create, sync, and manage calendar events",
       cta: "Connect Google Calendar",
-      route: "/create-event",
+      route: "/events",
       icon: Calendar,
     },
     {
@@ -37,7 +37,7 @@ export default function OnboardingContent() {
       title: "QuickBooks Integration",
       description: "Sync invoices, payments, and financial data",
       cta: "Connect QuickBooks",
-      route: "/accounting-integration",
+      route: "/sheet",
       icon: DollarSign,
     },
   ];
