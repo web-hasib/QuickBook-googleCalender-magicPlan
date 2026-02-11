@@ -352,13 +352,51 @@
 
 // ============================================================================================ //
 
-// /app/api/google-sheet/route.ts
+// /app/api/sheet/route.ts
 import { google, sheets_v4 } from "googleapis";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z, ZodError } from "zod";
 
 // ============================================================================
-// 1. CONFIGURATION & SCHEMAS
+// 1. TYPES & INTERFACES
+// ============================================================================
+
+interface SheetInfo {
+  id: number;
+  title: string;
+  rowCount: number;
+  columnCount: number;
+}
+
+interface SheetData {
+  headers: string[];
+  rows: any[][];
+  rowCount: number;
+  columnCount: number;
+}
+
+interface SearchResult {
+  row: number;
+  col: number;
+  value: any;
+}
+
+interface CellUpdate {
+  row: number;
+  col: number;
+  value: any;
+}
+
+interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+  details?: any;
+}
+
+// ============================================================================
+// 2. CONFIGURATION & VALIDATION
 // ============================================================================
 
 const CONFIG = {
@@ -367,35 +405,120 @@ const CONFIG = {
   spreadsheetId: process.env.GOOGLE_SHEET_ID,
 } as const;
 
-// Flexible schemas for different operations
+// Validate configuration on module load
+function validateConfig() {
+  if (!CONFIG.email) {
+    throw new Error("GOOGLE_CLIENT_EMAIL environment variable is not set");
+  }
+  if (!CONFIG.privateKey) {
+    throw new Error("GOOGLE_PRIVATE_KEY environment variable is not set");
+  }
+  if (!CONFIG.spreadsheetId) {
+    throw new Error("GOOGLE_SHEET_ID environment variable is not set");
+  }
+}
+
+// ============================================================================
+// 3. VALIDATION SCHEMAS
+// ============================================================================
+
 const cellUpdateSchema = z.object({
-  row: z.number().int().positive(),
-  col: z.number().int().positive(),
+  row: z.number().int().positive("Row must be a positive integer"),
+  col: z.number().int().positive("Column must be a positive integer"),
   value: z.any(),
 });
 
 const batchUpdateSchema = z.object({
-  updates: z.array(cellUpdateSchema),
+  updates: z
+    .array(cellUpdateSchema)
+    .min(1, "At least one update is required")
+    .max(1000, "Maximum 1000 updates per batch"),
 });
 
 const rangeUpdateSchema = z.object({
-  range: z.string(), // e.g., "Sheet1!A1:C10"
-  values: z.array(z.array(z.any())),
+  range: z
+    .string()
+    .regex(
+      /^[^!]+![A-Z]+\d+:[A-Z]+\d+$/,
+      "Invalid range format. Use format: Sheet1!A1:C10",
+    ),
+  values: z.array(z.array(z.any())).min(1, "Values array cannot be empty"),
 });
 
 const addRowSchema = z.object({
-  sheetName: z.string().optional(),
-  values: z.array(z.any()),
+  sheetName: z.string().min(1, "Sheet name cannot be empty").optional(),
+  values: z.array(z.any()).min(1, "Values array cannot be empty"),
 });
 
 const addColumnSchema = z.object({
-  sheetName: z.string().optional(),
-  headerName: z.string(),
-  position: z.number().int().nonnegative().optional(), // 0-based index
+  sheetName: z.string().min(1, "Sheet name cannot be empty").optional(),
+  headerName: z.string().min(1, "Header name cannot be empty"),
+  position: z
+    .number()
+    .int()
+    .nonnegative("Position must be non-negative")
+    .optional(),
+});
+
+const createSheetSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Sheet title cannot be empty")
+    .max(100, "Sheet title cannot exceed 100 characters"),
+});
+
+const renameSheetSchema = z.object({
+  sheetId: z.number().int().nonnegative("Sheet ID must be non-negative"),
+  newTitle: z
+    .string()
+    .min(1, "New title cannot be empty")
+    .max(100, "New title cannot exceed 100 characters"),
+});
+
+const sortRangeSchema = z.object({
+  sheetName: z.string().min(1, "Sheet name cannot be empty"),
+  range: z.string().min(1, "Range cannot be empty"),
+  sortColumn: z.number().int().nonnegative("Sort column must be non-negative"),
+  ascending: z.boolean().optional(),
+});
+
+const insertRowSchema = z.object({
+  sheetName: z.string().min(1, "Sheet name cannot be empty"),
+  rowIndex: z.number().int().nonnegative("Row index must be non-negative"),
+  values: z.array(z.any()).optional(),
 });
 
 // ============================================================================
-// 2. ENHANCED GOOGLE SHEETS SERVICE
+// 4. CUSTOM ERROR CLASSES
+// ============================================================================
+
+class GoogleSheetsError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 500,
+    public details?: any,
+  ) {
+    super(message);
+    this.name = "GoogleSheetsError";
+  }
+}
+
+class ValidationError extends GoogleSheetsError {
+  constructor(message: string, details?: any) {
+    super(message, 400, details);
+    this.name = "ValidationError";
+  }
+}
+
+class NotFoundError extends GoogleSheetsError {
+  constructor(message: string) {
+    super(message, 404);
+    this.name = "NotFoundError";
+  }
+}
+
+// ============================================================================
+// 5. ENHANCED GOOGLE SHEETS SERVICE
 // ============================================================================
 
 class EnhancedGoogleSheetsService {
@@ -403,11 +526,12 @@ class EnhancedGoogleSheetsService {
   private initialized = false;
 
   constructor() {
+    this.initialize();
+  }
+
+  private initialize(): void {
     try {
-      if (!CONFIG.email || !CONFIG.privateKey || !CONFIG.spreadsheetId) {
-        console.error("❌ Missing required environment variables");
-        return;
-      }
+      validateConfig();
 
       const auth = new google.auth.JWT({
         email: CONFIG.email,
@@ -417,163 +541,239 @@ class EnhancedGoogleSheetsService {
 
       this.sheets = google.sheets({ version: "v4", auth });
       this.initialized = true;
+
+      console.log("✅ Google Sheets service initialized successfully");
     } catch (error) {
-      console.error("❌ Failed to initialize Google Sheets:", error);
+      console.error("❌ Failed to initialize Google Sheets service:", error);
+      throw new GoogleSheetsError(
+        "Failed to initialize Google Sheets service",
+        500,
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
-  private checkInitialized() {
+  private checkInitialized(): void {
     if (!this.initialized || !this.sheets) {
-      throw new Error("Google Sheets service not initialized");
+      throw new GoogleSheetsError(
+        "Google Sheets service is not properly initialized",
+        500,
+      );
     }
+  }
+
+  private handleGoogleApiError(error: any): never {
+    console.error("Google API Error:", error);
+
+    if (error.code === 404) {
+      throw new NotFoundError("Spreadsheet or sheet not found");
+    }
+
+    if (error.code === 403) {
+      throw new GoogleSheetsError(
+        "Permission denied. Check service account permissions.",
+        403,
+      );
+    }
+
+    if (error.code === 429) {
+      throw new GoogleSheetsError(
+        "Rate limit exceeded. Please try again later.",
+        429,
+      );
+    }
+
+    throw new GoogleSheetsError(
+      error.message || "An error occurred while accessing Google Sheets",
+      error.code || 500,
+    );
   }
 
   // ========================================================================
   // SHEET METADATA
   // ========================================================================
 
-  /**
-   * Get all sheets/tabs in the spreadsheet
-   */
-  async getSheets(): Promise<
-    Array<{ id: number; title: string; rowCount: number; columnCount: number }>
-  > {
+  async getSheets(): Promise<SheetInfo[]> {
     this.checkInitialized();
 
-    const { data } = await this.sheets!.spreadsheets.get({
-      spreadsheetId: CONFIG.spreadsheetId!,
-    });
+    try {
+      const response = await this.sheets!.spreadsheets.get({
+        spreadsheetId: CONFIG.spreadsheetId!,
+      });
 
-    return (
-      data.sheets?.map((sheet) => ({
-        id: sheet.properties?.sheetId || 0,
-        title: sheet.properties?.title || "",
-        rowCount: sheet.properties?.gridProperties?.rowCount || 0,
-        columnCount: sheet.properties?.gridProperties?.columnCount || 0,
-      })) || []
-    );
+      return (
+        response.data.sheets?.map((sheet) => ({
+          id: sheet.properties?.sheetId ?? 0,
+          title: sheet.properties?.title ?? "Untitled",
+          rowCount: sheet.properties?.gridProperties?.rowCount ?? 0,
+          columnCount: sheet.properties?.gridProperties?.columnCount ?? 0,
+        })) ?? []
+      );
+    } catch (error) {
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Create a new sheet/tab
-   */
-  async createSheet(title: string): Promise<{ id: number; title: string }> {
+  async createSheet(title: string): Promise<SheetInfo> {
     this.checkInitialized();
 
-    const response = await this.sheets!.spreadsheets.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        requests: [
-          {
-            addSheet: {
-              properties: {
-                title,
-                gridProperties: {
-                  rowCount: 1000,
-                  columnCount: 26,
+    try {
+      // Check if sheet with same name exists
+      const existingSheets = await this.getSheets();
+      if (existingSheets.some((sheet) => sheet.title === title)) {
+        throw new ValidationError(`Sheet with title "${title}" already exists`);
+      }
+
+      const response = await this.sheets!.spreadsheets.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title,
+                  gridProperties: {
+                    rowCount: 1000,
+                    columnCount: 26,
+                    frozenRowCount: 1, // Freeze header row by default
+                  },
                 },
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
 
-    const sheetId =
-      response.data.replies?.[0]?.addSheet?.properties?.sheetId || 0;
-    return { id: sheetId, title };
+      const sheetId =
+        response.data.replies?.[0]?.addSheet?.properties?.sheetId ?? 0;
+
+      return {
+        id: sheetId,
+        title,
+        rowCount: 1000,
+        columnCount: 26,
+      };
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Rename a sheet
-   */
   async renameSheet(sheetId: number, newTitle: string): Promise<void> {
     this.checkInitialized();
 
-    await this.sheets!.spreadsheets.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        requests: [
-          {
-            updateSheetProperties: {
-              properties: {
-                sheetId,
-                title: newTitle,
+    try {
+      // Check if new title is already in use
+      const existingSheets = await this.getSheets();
+      if (
+        existingSheets.some(
+          (sheet) => sheet.title === newTitle && sheet.id !== sheetId,
+        )
+      ) {
+        throw new ValidationError(
+          `Sheet with title "${newTitle}" already exists`,
+        );
+      }
+
+      await this.sheets!.spreadsheets.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          requests: [
+            {
+              updateSheetProperties: {
+                properties: {
+                  sheetId,
+                  title: newTitle,
+                },
+                fields: "title",
               },
-              fields: "title",
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Delete a sheet
-   */
   async deleteSheet(sheetId: number): Promise<void> {
     this.checkInitialized();
 
-    await this.sheets!.spreadsheets.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        requests: [
-          {
-            deleteSheet: {
-              sheetId,
+    try {
+      // Prevent deleting the last sheet
+      const sheets = await this.getSheets();
+      if (sheets.length === 1) {
+        throw new ValidationError("Cannot delete the last remaining sheet");
+      }
+
+      await this.sheets!.spreadsheets.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          requests: [
+            {
+              deleteSheet: {
+                sheetId,
+              },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
+    }
   }
 
   // ========================================================================
   // DATA OPERATIONS
   // ========================================================================
 
-  /**
-   * Get data from a specific range
-   */
   async getRange(range: string): Promise<any[][]> {
     this.checkInitialized();
 
-    const response = await this.sheets!.spreadsheets.values.get({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      range,
-    });
+    try {
+      const response = await this.sheets!.spreadsheets.values.get({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        range,
+      });
 
-    return response.data.values || [];
+      return response.data.values ?? [];
+    } catch (error) {
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Get entire sheet data with metadata
-   */
-  async getSheetData(sheetName: string): Promise<{
-    headers: string[];
-    rows: any[][];
-    rowCount: number;
-    columnCount: number;
-  }> {
+  async getSheetData(sheetName: string): Promise<SheetData> {
     this.checkInitialized();
 
-    const range = `${sheetName}!A1:ZZ`;
-    const values = await this.getRange(range);
+    try {
+      const range = `${sheetName}!A1:ZZ`;
+      const values = await this.getRange(range);
 
-    const headers = values[0] || [];
-    const rows = values.slice(1);
+      if (values.length === 0) {
+        return {
+          headers: [],
+          rows: [],
+          rowCount: 0,
+          columnCount: 0,
+        };
+      }
 
-    return {
-      headers,
-      rows,
-      rowCount: values.length,
-      columnCount: headers.length,
-    };
+      const headers = values[0] ?? [];
+      const rows = values.slice(1);
+
+      return {
+        headers,
+        rows,
+        rowCount: values.length,
+        columnCount: headers.length,
+      };
+    } catch (error) {
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Update a single cell
-   */
   async updateCell(
     sheetName: string,
     row: number,
@@ -582,75 +782,89 @@ class EnhancedGoogleSheetsService {
   ): Promise<void> {
     this.checkInitialized();
 
-    const columnLetter = this.numberToColumn(col);
-    const range = `${sheetName}!${columnLetter}${row}`;
+    try {
+      const columnLetter = this.numberToColumn(col);
+      const range = `${sheetName}!${columnLetter}${row}`;
 
-    await this.sheets!.spreadsheets.values.update({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      range,
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [[value]],
-      },
-    });
+      await this.sheets!.spreadsheets.values.update({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        range,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[value]],
+        },
+      });
+    } catch (error) {
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Batch update multiple cells
-   */
-  async batchUpdate(
-    sheetName: string,
-    updates: Array<{ row: number; col: number; value: any }>,
-  ): Promise<void> {
+  async batchUpdate(sheetName: string, updates: CellUpdate[]): Promise<void> {
     this.checkInitialized();
 
-    const data = updates.map((update) => ({
-      range: `${sheetName}!${this.numberToColumn(update.col)}${update.row}`,
-      values: [[update.value]],
-    }));
+    if (updates.length === 0) {
+      throw new ValidationError("No updates provided");
+    }
 
-    await this.sheets!.spreadsheets.values.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        valueInputOption: "USER_ENTERED",
-        data,
-      },
-    });
+    if (updates.length > 1000) {
+      throw new ValidationError("Maximum 1000 updates per batch");
+    }
+
+    try {
+      const data = updates.map((update) => ({
+        range: `${sheetName}!${this.numberToColumn(update.col)}${update.row}`,
+        values: [[update.value]],
+      }));
+
+      await this.sheets!.spreadsheets.values.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          valueInputOption: "USER_ENTERED",
+          data,
+        },
+      });
+    } catch (error) {
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Update a range of cells
-   */
   async updateRange(range: string, values: any[][]): Promise<void> {
     this.checkInitialized();
 
-    await this.sheets!.spreadsheets.values.update({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      range,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values },
-    });
+    try {
+      await this.sheets!.spreadsheets.values.update({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        range,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values },
+      });
+    } catch (error) {
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Append a new row
-   */
   async appendRow(sheetName: string, values: any[]): Promise<void> {
     this.checkInitialized();
 
-    await this.sheets!.spreadsheets.values.append({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      range: `${sheetName}!A1`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [values],
-      },
-    });
+    if (values.length === 0) {
+      throw new ValidationError("Cannot append empty row");
+    }
+
+    try {
+      await this.sheets!.spreadsheets.values.append({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        range: `${sheetName}!A1`,
+        valueInputOption: "USER_ENTERED",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: {
+          values: [values],
+        },
+      });
+    } catch (error) {
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Insert a row at a specific position
-   */
   async insertRow(
     sheetName: string,
     rowIndex: number,
@@ -658,64 +872,80 @@ class EnhancedGoogleSheetsService {
   ): Promise<void> {
     this.checkInitialized();
 
-    const sheetId = await this.getSheetIdByName(sheetName);
+    try {
+      const sheetId = await this.getSheetIdByName(sheetName);
 
-    // Insert empty row
-    await this.sheets!.spreadsheets.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        requests: [
-          {
-            insertDimension: {
-              range: {
-                sheetId,
-                dimension: "ROWS",
-                startIndex: rowIndex,
-                endIndex: rowIndex + 1,
+      // Insert empty row
+      await this.sheets!.spreadsheets.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          requests: [
+            {
+              insertDimension: {
+                range: {
+                  sheetId,
+                  dimension: "ROWS",
+                  startIndex: rowIndex,
+                  endIndex: rowIndex + 1,
+                },
+                inheritFromBefore: rowIndex > 0,
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
 
-    // If values provided, populate the row
-    if (values && values.length > 0) {
-      const range = `${sheetName}!A${rowIndex + 1}`;
-      await this.updateRange(range, [values]);
+      // If values provided, populate the row
+      if (values && values.length > 0) {
+        const range = `${sheetName}!A${rowIndex + 1}`;
+        await this.updateRange(range, [values]);
+      }
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
     }
   }
 
-  /**
-   * Delete a row
-   */
   async deleteRow(sheetName: string, rowIndex: number): Promise<void> {
     this.checkInitialized();
 
-    const sheetId = await this.getSheetIdByName(sheetName);
+    try {
+      const sheetId = await this.getSheetIdByName(sheetName);
+      const sheetData = await this.getSheetData(sheetName);
 
-    await this.sheets!.spreadsheets.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId,
-                dimension: "ROWS",
-                startIndex: rowIndex,
-                endIndex: rowIndex + 1,
+      // Prevent deleting header row
+      if (rowIndex === 0) {
+        throw new ValidationError("Cannot delete the header row (row 0)");
+      }
+
+      // Prevent deleting when only header exists
+      if (sheetData.rowCount <= 1) {
+        throw new ValidationError("Cannot delete row when only header exists");
+      }
+
+      await this.sheets!.spreadsheets.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId,
+                  dimension: "ROWS",
+                  startIndex: rowIndex,
+                  endIndex: rowIndex + 1,
+                },
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Add a new column
-   */
   async addColumn(
     sheetName: string,
     headerName: string,
@@ -723,71 +953,103 @@ class EnhancedGoogleSheetsService {
   ): Promise<void> {
     this.checkInitialized();
 
-    const sheetId = await this.getSheetIdByName(sheetName);
+    try {
+      const sheetId = await this.getSheetIdByName(sheetName);
+      const sheets = await this.getSheets();
+      const sheet = sheets.find((s) => s.title === sheetName);
 
-    // Get current column count to determine where to add
-    const sheets = await this.getSheets();
-    const sheet = sheets.find((s) => s.title === sheetName);
-    const columnIndex = position ?? sheet?.columnCount ?? 0;
+      if (!sheet) {
+        throw new NotFoundError(`Sheet "${sheetName}" not found`);
+      }
 
-    // Insert column
-    await this.sheets!.spreadsheets.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        requests: [
-          {
-            insertDimension: {
-              range: {
-                sheetId,
-                dimension: "COLUMNS",
-                startIndex: columnIndex,
-                endIndex: columnIndex + 1,
+      const columnIndex = position ?? sheet.columnCount;
+
+      // Validate position
+      if (position !== undefined && position > sheet.columnCount) {
+        throw new ValidationError(
+          `Position ${position} exceeds sheet column count ${sheet.columnCount}`,
+        );
+      }
+
+      // Insert column
+      await this.sheets!.spreadsheets.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          requests: [
+            {
+              insertDimension: {
+                range: {
+                  sheetId,
+                  dimension: "COLUMNS",
+                  startIndex: columnIndex,
+                  endIndex: columnIndex + 1,
+                },
+                inheritFromBefore: columnIndex > 0,
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
 
-    // Set header name
-    const columnLetter = this.numberToColumn(columnIndex + 1);
-    await this.updateCell(sheetName, 1, columnIndex + 1, headerName);
+      // Set header name
+      await this.updateCell(sheetName, 1, columnIndex + 1, headerName);
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Delete a column
-   */
   async deleteColumn(sheetName: string, columnIndex: number): Promise<void> {
     this.checkInitialized();
 
-    const sheetId = await this.getSheetIdByName(sheetName);
+    try {
+      const sheetId = await this.getSheetIdByName(sheetName);
+      const sheets = await this.getSheets();
+      const sheet = sheets.find((s) => s.title === sheetName);
 
-    await this.sheets!.spreadsheets.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId,
-                dimension: "COLUMNS",
-                startIndex: columnIndex,
-                endIndex: columnIndex + 1,
+      if (!sheet) {
+        throw new NotFoundError(`Sheet "${sheetName}" not found`);
+      }
+
+      // Prevent deleting the last column
+      if (sheet.columnCount === 1) {
+        throw new ValidationError("Cannot delete the last remaining column");
+      }
+
+      // Validate column index
+      if (columnIndex >= sheet.columnCount) {
+        throw new ValidationError(
+          `Column index ${columnIndex} exceeds sheet column count ${sheet.columnCount}`,
+        );
+      }
+
+      await this.sheets!.spreadsheets.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId,
+                  dimension: "COLUMNS",
+                  startIndex: columnIndex,
+                  endIndex: columnIndex + 1,
+                },
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
+    }
   }
 
   // ========================================================================
   // SORTING & FILTERING
   // ========================================================================
 
-  /**
-   * Sort a range by a specific column
-   */
   async sortRange(
     sheetName: string,
     range: string,
@@ -796,114 +1058,124 @@ class EnhancedGoogleSheetsService {
   ): Promise<void> {
     this.checkInitialized();
 
-    const sheetId = await this.getSheetIdByName(sheetName);
+    try {
+      const sheetId = await this.getSheetIdByName(sheetName);
 
-    // Parse range to get start/end rows and columns
-    const rangeRegex = /([A-Z]+)(\d+):([A-Z]+)(\d+)/;
-    const match = range.match(rangeRegex);
+      // Parse range to get start/end rows and columns
+      const rangeRegex = /([A-Z]+)(\d+):([A-Z]+)(\d+)/;
+      const match = range.match(rangeRegex);
 
-    if (!match) {
-      throw new Error("Invalid range format");
-    }
+      if (!match) {
+        throw new ValidationError(
+          "Invalid range format. Expected format: A1:C10",
+        );
+      }
 
-    const startCol = this.columnToNumber(match[1]);
-    const startRow = parseInt(match[2]) - 1;
-    const endCol = this.columnToNumber(match[3]) + 1;
-    const endRow = parseInt(match[4]);
+      const startCol = this.columnToNumber(match[1]);
+      const startRow = parseInt(match[2], 10) - 1;
+      const endCol = this.columnToNumber(match[3]) + 1;
+      const endRow = parseInt(match[4], 10);
 
-    await this.sheets!.spreadsheets.batchUpdate({
-      spreadsheetId: CONFIG.spreadsheetId!,
-      requestBody: {
-        requests: [
-          {
-            sortRange: {
-              range: {
-                sheetId,
-                startRowIndex: startRow,
-                endRowIndex: endRow,
-                startColumnIndex: startCol,
-                endColumnIndex: endCol,
-              },
-              sortSpecs: [
-                {
-                  dimensionIndex: sortColumn,
-                  sortOrder: ascending ? "ASCENDING" : "DESCENDING",
+      // Validate sort column is within range
+      if (sortColumn < startCol || sortColumn >= endCol) {
+        throw new ValidationError(
+          `Sort column ${sortColumn} is outside the range ${range}`,
+        );
+      }
+
+      await this.sheets!.spreadsheets.batchUpdate({
+        spreadsheetId: CONFIG.spreadsheetId!,
+        requestBody: {
+          requests: [
+            {
+              sortRange: {
+                range: {
+                  sheetId,
+                  startRowIndex: startRow,
+                  endRowIndex: endRow,
+                  startColumnIndex: startCol,
+                  endColumnIndex: endCol,
                 },
-              ],
+                sortSpecs: [
+                  {
+                    dimensionIndex: sortColumn,
+                    sortOrder: ascending ? "ASCENDING" : "DESCENDING",
+                  },
+                ],
+              },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
+    }
   }
 
-  /**
-   * Search for a value in a sheet
-   */
-  async search(
-    sheetName: string,
-    searchTerm: string,
-  ): Promise<
-    Array<{
-      row: number;
-      col: number;
-      value: any;
-    }>
-  > {
+  async search(sheetName: string, searchTerm: string): Promise<SearchResult[]> {
     this.checkInitialized();
 
-    const data = await this.getSheetData(sheetName);
-    const results: Array<{ row: number; col: number; value: any }> = [];
+    if (!searchTerm || searchTerm.trim().length === 0) {
+      throw new ValidationError("Search term cannot be empty");
+    }
 
-    // Search in headers
-    data.headers.forEach((header, colIndex) => {
-      if (String(header).toLowerCase().includes(searchTerm.toLowerCase())) {
-        results.push({
-          row: 1,
-          col: colIndex + 1,
-          value: header,
-        });
-      }
-    });
+    try {
+      const data = await this.getSheetData(sheetName);
+      const results: SearchResult[] = [];
+      const normalizedSearch = searchTerm.toLowerCase().trim();
 
-    // Search in rows
-    data.rows.forEach((row, rowIndex) => {
-      row.forEach((cell, colIndex) => {
-        if (String(cell).toLowerCase().includes(searchTerm.toLowerCase())) {
+      // Search in headers
+      data.headers.forEach((header, colIndex) => {
+        if (header && String(header).toLowerCase().includes(normalizedSearch)) {
           results.push({
-            row: rowIndex + 2, // +2 because headers are row 1
+            row: 1,
             col: colIndex + 1,
-            value: cell,
+            value: header,
           });
         }
       });
-    });
 
-    return results;
+      // Search in rows
+      data.rows.forEach((row, rowIndex) => {
+        row.forEach((cell, colIndex) => {
+          if (cell && String(cell).toLowerCase().includes(normalizedSearch)) {
+            results.push({
+              row: rowIndex + 2, // +2 because headers are row 1
+              col: colIndex + 1,
+              value: cell,
+            });
+          }
+        });
+      });
+
+      return results;
+    } catch (error) {
+      if (error instanceof GoogleSheetsError) throw error;
+      this.handleGoogleApiError(error);
+    }
   }
 
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
 
-  /**
-   * Get sheet ID by name
-   */
   private async getSheetIdByName(sheetName: string): Promise<number> {
     const sheets = await this.getSheets();
     const sheet = sheets.find((s) => s.title === sheetName);
 
     if (!sheet) {
-      throw new Error(`Sheet "${sheetName}" not found`);
+      throw new NotFoundError(`Sheet "${sheetName}" not found`);
     }
 
     return sheet.id;
   }
 
-  /**
-   * Convert column number to letter (1 = A, 27 = AA)
-   */
   private numberToColumn(num: number): string {
+    if (num <= 0) {
+      throw new ValidationError("Column number must be positive");
+    }
+
     let column = "";
     while (num > 0) {
       const remainder = (num - 1) % 26;
@@ -913,10 +1185,13 @@ class EnhancedGoogleSheetsService {
     return column;
   }
 
-  /**
-   * Convert column letter to number (A = 1, AA = 27)
-   */
   private columnToNumber(col: string): number {
+    if (!col || !/^[A-Z]+$/.test(col)) {
+      throw new ValidationError(
+        "Invalid column format. Use uppercase letters (A-Z)",
+      );
+    }
+
     let num = 0;
     for (let i = 0; i < col.length; i++) {
       num = num * 26 + (col.charCodeAt(i) - 64);
@@ -925,22 +1200,101 @@ class EnhancedGoogleSheetsService {
   }
 }
 
-// Initialize service singleton
-const service = new EnhancedGoogleSheetsService();
+// ============================================================================
+// 6. INITIALIZE SERVICE
+// ============================================================================
+
+let service: EnhancedGoogleSheetsService | null = null;
+
+function getService(): EnhancedGoogleSheetsService {
+  if (!service) {
+    service = new EnhancedGoogleSheetsService();
+  }
+  return service;
+}
 
 // ============================================================================
-// 3. API ROUTE HANDLERS
+// 7. RESPONSE HELPERS
+// ============================================================================
+
+function createSuccessResponse<T>(
+  data: T,
+  message?: string,
+  status: number = 200,
+): NextResponse<ApiResponse<T>> {
+  return NextResponse.json(
+    {
+      success: true,
+      data,
+      ...(message && { message }),
+    },
+    { status },
+  );
+}
+
+function createErrorResponse(
+  error: string,
+  status: number = 500,
+  details?: any,
+): NextResponse<ApiResponse> {
+  return NextResponse.json(
+    {
+      success: false,
+      error,
+      ...(details && { details }),
+    },
+    { status },
+  );
+}
+
+function handleError(error: unknown): NextResponse<ApiResponse> {
+  console.error("API Error:", error);
+
+  if (error instanceof ValidationError) {
+    return createErrorResponse(error.message, error.statusCode, error.details);
+  }
+
+  if (error instanceof NotFoundError) {
+    return createErrorResponse(error.message, error.statusCode);
+  }
+
+  if (error instanceof GoogleSheetsError) {
+    return createErrorResponse(error.message, error.statusCode, error.details);
+  }
+
+  if (error instanceof ZodError) {
+    return createErrorResponse(
+      "Validation failed",
+      400,
+      error.errors.map((e) => ({
+        path: e.path.join("."),
+        message: e.message,
+      })),
+    );
+  }
+
+  if (error instanceof Error) {
+    return createErrorResponse(error.message, 500);
+  }
+
+  return createErrorResponse("An unexpected error occurred", 500);
+}
+
+// ============================================================================
+// 8. API ROUTE HANDLERS
 // ============================================================================
 
 /**
- * GET /api/google-sheet
+ * GET /api/sheet
  * Query params:
  * - action: "sheets" | "data" | "range" | "search"
  * - sheetName: string (for data, range, search)
  * - range: string (for range action)
  * - q: string (for search action)
  */
-export async function GET(req: Request) {
+export async function GET(
+  req: NextRequest,
+): Promise<NextResponse<ApiResponse>> {
   try {
     const { searchParams } = new URL(req.url);
     const action = searchParams.get("action") || "sheets";
@@ -948,126 +1302,116 @@ export async function GET(req: Request) {
     const range = searchParams.get("range");
     const searchQuery = searchParams.get("q");
 
+    const svc = getService();
+
     switch (action) {
-      case "sheets":
-        const sheets = await service.getSheets();
-        return NextResponse.json({ success: true, data: sheets });
+      case "sheets": {
+        const sheets = await svc.getSheets();
+        return createSuccessResponse(sheets);
+      }
 
-      case "data":
-        const data = await service.getSheetData(sheetName);
-        return NextResponse.json({ success: true, data });
+      case "data": {
+        const data = await svc.getSheetData(sheetName);
+        return createSuccessResponse(data);
+      }
 
-      case "range":
+      case "range": {
         if (!range) {
-          return NextResponse.json(
-            { success: false, error: "Range parameter required" },
-            { status: 400 },
-          );
+          return createErrorResponse("Range parameter is required", 400);
         }
-        const rangeData = await service.getRange(range);
-        return NextResponse.json({ success: true, data: rangeData });
+        const rangeData = await svc.getRange(range);
+        return createSuccessResponse(rangeData);
+      }
 
-      case "search":
+      case "search": {
         if (!searchQuery) {
-          return NextResponse.json(
-            { success: false, error: "Search query (q) required" },
-            { status: 400 },
+          return createErrorResponse(
+            "Search query (q) parameter is required",
+            400,
           );
         }
-        const results = await service.search(sheetName, searchQuery);
-        return NextResponse.json({ success: true, data: results });
+        const results = await svc.search(sheetName, searchQuery);
+        return createSuccessResponse(results);
+      }
 
       default:
-        return NextResponse.json(
-          { success: false, error: "Invalid action" },
-          { status: 400 },
+        return createErrorResponse(
+          `Invalid action: ${action}. Valid actions: sheets, data, range, search`,
+          400,
         );
     }
-  } catch (err: any) {
-    console.error("GET Error:", err);
-    return NextResponse.json(
-      { success: false, error: err.message },
-      { status: 500 },
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
 
 /**
- * POST /api/google-sheet
+ * POST /api/sheet
  * Body depends on action:
  * - createSheet: { action: "createSheet", title: string }
  * - appendRow: { action: "appendRow", sheetName?: string, values: any[] }
  * - insertRow: { action: "insertRow", sheetName: string, rowIndex: number, values?: any[] }
  * - addColumn: { action: "addColumn", sheetName?: string, headerName: string, position?: number }
  */
-export async function POST(req: Request) {
+export async function POST(
+  req: NextRequest,
+): Promise<NextResponse<ApiResponse>> {
   try {
     const body = await req.json();
     const { action } = body;
 
+    if (!action) {
+      return createErrorResponse("Action field is required", 400);
+    }
+
+    const svc = getService();
+
     switch (action) {
-      case "createSheet":
-        const sheet = await service.createSheet(body.title);
-        return NextResponse.json(
-          { success: true, data: sheet },
-          { status: 201 },
-        );
+      case "createSheet": {
+        const validated = createSheetSchema.parse(body);
+        const sheet = await svc.createSheet(validated.title);
+        return createSuccessResponse(sheet, "Sheet created successfully", 201);
+      }
 
-      case "appendRow":
-        const appendSchema = addRowSchema.parse(body);
-        await service.appendRow(
-          appendSchema.sheetName || "Sheet1",
-          appendSchema.values,
-        );
-        return NextResponse.json(
-          { success: true, message: "Row appended" },
-          { status: 201 },
-        );
+      case "appendRow": {
+        const validated = addRowSchema.parse(body);
+        await svc.appendRow(validated.sheetName || "Sheet1", validated.values);
+        return createSuccessResponse(null, "Row appended successfully", 201);
+      }
 
-      case "insertRow":
-        await service.insertRow(body.sheetName, body.rowIndex, body.values);
-        return NextResponse.json(
-          { success: true, message: "Row inserted" },
-          { status: 201 },
+      case "insertRow": {
+        const validated = insertRowSchema.parse(body);
+        await svc.insertRow(
+          validated.sheetName,
+          validated.rowIndex,
+          validated.values,
         );
+        return createSuccessResponse(null, "Row inserted successfully", 201);
+      }
 
-      case "addColumn":
-        const columnSchema = addColumnSchema.parse(body);
-        await service.addColumn(
-          columnSchema.sheetName || "Sheet1",
-          columnSchema.headerName,
-          columnSchema.position,
+      case "addColumn": {
+        const validated = addColumnSchema.parse(body);
+        await svc.addColumn(
+          validated.sheetName || "Sheet1",
+          validated.headerName,
+          validated.position,
         );
-        return NextResponse.json(
-          { success: true, message: "Column added" },
-          { status: 201 },
-        );
+        return createSuccessResponse(null, "Column added successfully", 201);
+      }
 
       default:
-        return NextResponse.json(
-          { success: false, error: "Invalid action" },
-          { status: 400 },
+        return createErrorResponse(
+          `Invalid action: ${action}. Valid actions: createSheet, appendRow, insertRow, addColumn`,
+          400,
         );
     }
-  } catch (err: any) {
-    console.error("POST Error:", err);
-
-    if (err instanceof ZodError) {
-      return NextResponse.json(
-        { success: false, error: "Validation failed", details: err.issues },
-        { status: 400 },
-      );
-    }
-
-    return NextResponse.json(
-      { success: false, error: err.message },
-      { status: 500 },
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
 
 /**
- * PUT /api/google-sheet
+ * PUT /api/sheet
  * Body:
  * - updateCell: { action: "updateCell", sheetName: string, row: number, col: number, value: any }
  * - batchUpdate: { action: "batchUpdate", sheetName: string, updates: Array<{row, col, value}> }
@@ -1075,80 +1419,91 @@ export async function POST(req: Request) {
  * - renameSheet: { action: "renameSheet", sheetId: number, newTitle: string }
  * - sort: { action: "sort", sheetName: string, range: string, sortColumn: number, ascending?: boolean }
  */
-export async function PUT(req: Request) {
+export async function PUT(
+  req: NextRequest,
+): Promise<NextResponse<ApiResponse>> {
   try {
     const body = await req.json();
     const { action } = body;
 
+    if (!action) {
+      return createErrorResponse("Action field is required", 400);
+    }
+
+    const svc = getService();
+
     switch (action) {
-      case "updateCell":
-        const cellSchema = cellUpdateSchema.parse(body);
-        await service.updateCell(
+      case "updateCell": {
+        const validated = cellUpdateSchema.parse(body);
+        if (!body.sheetName) {
+          return createErrorResponse("sheetName field is required", 400);
+        }
+        await svc.updateCell(
           body.sheetName,
-          cellSchema.row,
-          cellSchema.col,
-          cellSchema.value,
+          validated.row,
+          validated.col,
+          validated.value,
         );
-        return NextResponse.json({ success: true, message: "Cell updated" });
+        return createSuccessResponse(null, "Cell updated successfully");
+      }
 
-      case "batchUpdate":
-        const batchSchema = batchUpdateSchema.parse(body);
-        await service.batchUpdate(body.sheetName, batchSchema.updates);
-        return NextResponse.json({
-          success: true,
-          message: "Cells updated",
-        });
-
-      case "updateRange":
-        const rangeSchema = rangeUpdateSchema.parse(body);
-        await service.updateRange(rangeSchema.range, rangeSchema.values);
-        return NextResponse.json({ success: true, message: "Range updated" });
-
-      case "renameSheet":
-        await service.renameSheet(body.sheetId, body.newTitle);
-        return NextResponse.json({ success: true, message: "Sheet renamed" });
-
-      case "sort":
-        await service.sortRange(
-          body.sheetName,
-          body.range,
-          body.sortColumn,
-          body.ascending ?? true,
+      case "batchUpdate": {
+        const validated = batchUpdateSchema.parse(body);
+        if (!body.sheetName) {
+          return createErrorResponse("sheetName field is required", 400);
+        }
+        await svc.batchUpdate(body.sheetName, validated.updates);
+        return createSuccessResponse(
+          null,
+          `${validated.updates.length} cells updated successfully`,
         );
-        return NextResponse.json({ success: true, message: "Range sorted" });
+      }
+
+      case "updateRange": {
+        const validated = rangeUpdateSchema.parse(body);
+        await svc.updateRange(validated.range, validated.values);
+        return createSuccessResponse(null, "Range updated successfully");
+      }
+
+      case "renameSheet": {
+        const validated = renameSheetSchema.parse(body);
+        await svc.renameSheet(validated.sheetId, validated.newTitle);
+        return createSuccessResponse(null, "Sheet renamed successfully");
+      }
+
+      case "sort": {
+        const validated = sortRangeSchema.parse(body);
+        await svc.sortRange(
+          validated.sheetName,
+          validated.range,
+          validated.sortColumn,
+          validated.ascending ?? true,
+        );
+        return createSuccessResponse(null, "Range sorted successfully");
+      }
 
       default:
-        return NextResponse.json(
-          { success: false, error: "Invalid action" },
-          { status: 400 },
+        return createErrorResponse(
+          `Invalid action: ${action}. Valid actions: updateCell, batchUpdate, updateRange, renameSheet, sort`,
+          400,
         );
     }
-  } catch (err: any) {
-    console.error("PUT Error:", err);
-
-    if (err instanceof ZodError) {
-      return NextResponse.json(
-        { success: false, error: "Validation failed", details: err.issues },
-        { status: 400 },
-      );
-    }
-
-    return NextResponse.json(
-      { success: false, error: err.message },
-      { status: 500 },
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
 
 /**
- * DELETE /api/google-sheet
+ * DELETE /api/sheet
  * Query params:
  * - action: "sheet" | "row" | "column"
  * - sheetId: number (for sheet)
  * - sheetName: string (for row/column)
  * - index: number (for row/column - 0-based)
  */
-export async function DELETE(req: Request) {
+export async function DELETE(
+  req: NextRequest,
+): Promise<NextResponse<ApiResponse>> {
   try {
     const { searchParams } = new URL(req.url);
     const action = searchParams.get("action");
@@ -1156,54 +1511,62 @@ export async function DELETE(req: Request) {
     const sheetName = searchParams.get("sheetName");
     const index = searchParams.get("index");
 
+    if (!action) {
+      return createErrorResponse("Action parameter is required", 400);
+    }
+
+    const svc = getService();
+
     switch (action) {
-      case "sheet":
+      case "sheet": {
         if (!sheetId) {
-          return NextResponse.json(
-            { success: false, error: "sheetId required" },
-            { status: 400 },
-          );
+          return createErrorResponse("sheetId parameter is required", 400);
         }
-        await service.deleteSheet(parseInt(sheetId));
-        return NextResponse.json({
-          success: true,
-          message: "Sheet deleted",
-        });
+        const parsedSheetId = parseInt(sheetId, 10);
+        if (isNaN(parsedSheetId) || parsedSheetId < 0) {
+          return createErrorResponse("Invalid sheetId", 400);
+        }
+        await svc.deleteSheet(parsedSheetId);
+        return createSuccessResponse(null, "Sheet deleted successfully");
+      }
 
-      case "row":
+      case "row": {
         if (!sheetName || !index) {
-          return NextResponse.json(
-            { success: false, error: "sheetName and index required" },
-            { status: 400 },
+          return createErrorResponse(
+            "sheetName and index parameters are required",
+            400,
           );
         }
-        await service.deleteRow(sheetName, parseInt(index));
-        return NextResponse.json({ success: true, message: "Row deleted" });
+        const parsedIndex = parseInt(index, 10);
+        if (isNaN(parsedIndex) || parsedIndex < 0) {
+          return createErrorResponse("Invalid index", 400);
+        }
+        await svc.deleteRow(sheetName, parsedIndex);
+        return createSuccessResponse(null, "Row deleted successfully");
+      }
 
-      case "column":
+      case "column": {
         if (!sheetName || !index) {
-          return NextResponse.json(
-            { success: false, error: "sheetName and index required" },
-            { status: 400 },
+          return createErrorResponse(
+            "sheetName and index parameters are required",
+            400,
           );
         }
-        await service.deleteColumn(sheetName, parseInt(index));
-        return NextResponse.json({
-          success: true,
-          message: "Column deleted",
-        });
+        const parsedIndex = parseInt(index, 10);
+        if (isNaN(parsedIndex) || parsedIndex < 0) {
+          return createErrorResponse("Invalid index", 400);
+        }
+        await svc.deleteColumn(sheetName, parsedIndex);
+        return createSuccessResponse(null, "Column deleted successfully");
+      }
 
       default:
-        return NextResponse.json(
-          { success: false, error: "Invalid action" },
-          { status: 400 },
+        return createErrorResponse(
+          `Invalid action: ${action}. Valid actions: sheet, row, column`,
+          400,
         );
     }
-  } catch (err: any) {
-    console.error("DELETE Error:", err);
-    return NextResponse.json(
-      { success: false, error: err.message },
-      { status: 500 },
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
