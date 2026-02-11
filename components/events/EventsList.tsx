@@ -96,7 +96,7 @@ export default function EventsList() {
 
             {/* Create Event Button */}
             <Link
-              href="/create-event"
+              href="/events/create-event"
               className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 border border-white/30 hover:border-white/50 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl backdrop-blur-sm">
               <Calendar className="w-5 h-5" />
               <span>Create Event</span>
